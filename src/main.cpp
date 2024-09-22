@@ -4,6 +4,7 @@
 #include <RFIDAuth.h>
 #include <SPI.h>
 #include <WiFi.h>
+#include "ESPAsyncWebServer.h"
 
 constexpr uint8_t RST_PIN = 2;
 constexpr uint8_t SS_PIN = 5;
@@ -12,6 +13,7 @@ constexpr uint8_t RED_LED_PIN = 21;
 constexpr uint8_t GREEN_LED_PIN = 4;
 
 HTTPClient client;
+AsyncWebServer server(80);
 MFRC522 mfrc522(SS_PIN, RST_PIN);
 
 AuthClient authClient(&client, &mfrc522);
@@ -20,18 +22,19 @@ const char *ssid = "VIVOFIBRA-4BA8";
 const char *passwordWifi = "5E259B8056";
 
 // Login Server
-char httpLoginServer[] = "https://apiesp32.onrender.com/api/device/login";
+char httpLoginServer[] = "http://192.168.15.28:3000/api/device/login";
 
 AuthLoginResquest authLoginRequest;
 
 // Refresh Token Server
 char httpRefreshTokenServer[] =
-    "https://apiesp32.onrender.com/api/auth/refresh-token/device";
+    "http://192.168.15.28:3000/api/auth/refresh-token/device";
 
 // Check Card Server
-char httpCheckCardServer[] = "https://apiesp32.onrender.com/api/card/check";
+char httpCheckCardServer[] = "http://192.168.15.28:3000/api/card/check";
 
-typedef struct {
+typedef struct
+{
   String RefreshToken;
   String AccessToken;
 } AuthJwtTokens;
@@ -40,7 +43,8 @@ AuthJwtTokens authJwtTokens;
 
 void checkCardCallback(CheckCardResponse checkCardResponse);
 
-void setup() {
+void setup()
+{
   Serial.begin(9600);
   SPI.begin();
   mfrc522.PCD_Init();
@@ -49,8 +53,10 @@ void setup() {
   pinMode(GREEN_LED_PIN, OUTPUT);
 
   Serial.print("Connecting to WiFi");
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, passwordWifi);
-  while (WiFi.status() != WL_CONNECTED) {
+  while (WiFi.status() != WL_CONNECTED)
+  {
     digitalWrite(RED_LED_PIN, HIGH);
     digitalWrite(GREEN_LED_PIN, LOW);
     Serial.print(".");
@@ -62,13 +68,37 @@ void setup() {
   }
   digitalWrite(RED_LED_PIN, LOW);
   digitalWrite(GREEN_LED_PIN, LOW);
-  Serial.println("Connected to WiFi");
+  Serial.print("\nConnected to WiFi on IP: ");
+  Serial.println(WiFi.localIP());
+
+  server.on("/open", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+    request->send(200, "text/plain", "Hello, world");
+    for (int i = 0; i <= 5; i++) {
+      digitalWrite(GREEN_LED_PIN, HIGH);
+      delay(150);
+      digitalWrite(GREEN_LED_PIN, LOW);
+      delay(150);
+    } });
+
+  server.on("/closed", HTTP_GET, [](AsyncWebServerRequest *request)
+            {
+  
+    request->send(200, "text/plain", "Hello, world");
+    for (int i = 0; i <= 5; i++) {
+      digitalWrite(RED_LED_PIN, HIGH);
+      delay(150);
+      digitalWrite(RED_LED_PIN, LOW);
+      delay(150);
+    } });
+
+  server.begin();
 
   // Login Parameters
   authLoginRequest.email = "teste@gmail.com";
   authLoginRequest.password = "teste123";
   authLoginRequest.deviceName = "TESTEAPI";
-  authLoginRequest.deviceUid = "40e22efe2c491935e4a55c72fc153dad";
+  authLoginRequest.deviceUid = "8b7bd2787758f8f2f922c51d8fcfeb86";
 
   String teste = "teste";
   if (teste == "teste")
@@ -76,7 +106,8 @@ void setup() {
 
   AuthResponse AuthResponse =
       authClient.loginJwtToken(authLoginRequest, httpLoginServer);
-  if (AuthResponse.error) {
+  if (AuthResponse.error)
+  {
     Serial.println("Error: " + AuthResponse.errorMessage);
     return;
   }
@@ -87,7 +118,8 @@ void setup() {
   Serial.println("Access token: " + authJwtTokens.AccessToken);
 }
 
-void loop() {
+void loop()
+{
   String cardUid = authClient.getCardId();
   if (cardUid == "")
     return;
@@ -99,17 +131,21 @@ void loop() {
   checkCardCallback(Response);
 }
 
-void checkCardCallback(CheckCardResponse checkCardResponse) {
+void checkCardCallback(CheckCardResponse checkCardResponse)
+{
   // Put here the code that you want to execute when the callback is called
 
-  if (checkCardResponse.error) {
+  if (checkCardResponse.error)
+  {
     Serial.println("Error: " + checkCardResponse.message);
     return;
   }
   Serial.println("Message: " + checkCardResponse.message);
-  if (checkCardResponse.message == "Blocked") {
+  if (checkCardResponse.message == "Blocked")
+  {
     Serial.println("Blocked card");
-    for (int i = 0; i <= 5; i++) {
+    for (int i = 0; i <= 5; i++)
+    {
       digitalWrite(RED_LED_PIN, HIGH);
       delay(150);
       digitalWrite(RED_LED_PIN, LOW);
@@ -118,7 +154,8 @@ void checkCardCallback(CheckCardResponse checkCardResponse) {
     return;
   }
   Serial.println("Authorized card");
-  for (int i = 0; i <= 5; i++) {
+  for (int i = 0; i <= 5; i++)
+  {
     digitalWrite(GREEN_LED_PIN, HIGH);
     delay(150);
     digitalWrite(GREEN_LED_PIN, LOW);
